@@ -26,6 +26,7 @@ import { TaskPanel } from './TaskPanel';
 import { ChatSidebar } from '@/features/chat/components/Sidebar';
 import { ChatLauncher } from '@/features/chat/components/ChatLauncher';
 import { Telemetry } from '@/features/telemetry/Telemetry';
+import { FocusBadge } from '@/features/focus/FocusBadge';
 
 export function Dashboard() {
   const { data: tasks, isLoading, error } = useTasks();
@@ -136,6 +137,10 @@ export function Dashboard() {
         <div className="sticky top-0 z-20 bg-bg pt-safe">
           <div className="px-3 pb-2">
             <TopBar counts={counts} />
+          </div>
+          {/* Mobile focus badge — only renders when a focus session is active. */}
+          <div className="flex justify-end px-3 pb-1">
+            <FocusBadge />
           </div>
         </div>
 

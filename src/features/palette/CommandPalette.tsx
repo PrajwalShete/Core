@@ -5,6 +5,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { clearHistory } from '@/features/chat/api';
 import type { Task } from '@/features/tasks/types';
 import { emit } from '@/shared/lib/events';
+import { isSoundEnabled, setSoundEnabled } from '@/shared/lib/sounds';
+import { useTheme } from '@/shared/hooks/useTheme';
 import { cn } from '@/shared/lib/cn';
 
 interface Props {
@@ -20,6 +22,7 @@ export function CommandPalette({ open, onOpenChange, onOpenTask, onOpenChat }: P
   const { data: tasks = [] } = useTasks();
   const toggle = useToggleDone();
   const qc = useQueryClient();
+  const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const [query, setQuery] = useState('');
 
   // Reset query when the palette opens, so each invocation starts fresh.
@@ -110,6 +113,27 @@ export function CommandPalette({ open, onOpenChange, onOpenTask, onOpenChat }: P
               const end = Date.now() + 25 * 60_000;
               localStorage.setItem('core_focus_until', String(end));
               window.dispatchEvent(new StorageEvent('storage', { key: 'core_focus_until' }));
+            }}
+          />
+          <PaletteItem
+            value={`sound ${isSoundEnabled() ? 'off mute' : 'on enable'}`}
+            label={isSoundEnabled() ? 'Turn sound off' : 'Turn sound on'}
+            hint={isSoundEnabled() ? 'mute' : 'enable'}
+            onSelect={() => {
+              const next = !isSoundEnabled();
+              setSoundEnabled(next);
+              if (next) emit('play-sound', { kind: 'open' });
+              close();
+            }}
+          />
+          <PaletteItem
+            value={`theme ${themeMode === 'system' ? 'light' : themeMode === 'light' ? 'dark' : 'system'}`}
+            label={`Theme — switch to ${themeMode === 'system' ? 'light' : themeMode === 'light' ? 'dark' : 'system'}`}
+            hint={themeMode}
+            onSelect={() => {
+              const next = themeMode === 'system' ? 'light' : themeMode === 'light' ? 'dark' : 'system';
+              setThemeMode(next);
+              close();
             }}
           />
         </Command.Group>
