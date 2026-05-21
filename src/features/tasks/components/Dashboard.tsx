@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTasks } from '../hooks';
+import { useTasks, useToggleDone } from '../hooks';
 import { bucketTasks, pickHero } from '../bucketing';
 import { useNow } from '@/shared/hooks/useNow';
 import { useIsMobile } from '@/shared/hooks/useMediaQuery';
@@ -7,6 +7,7 @@ import { useShortcuts } from '@/shared/hooks/useShortcuts';
 import { useTaskFlash } from '@/shared/hooks/useTaskFlash';
 import { FlashProvider } from '@/shared/lib/flash-context';
 import { emit, on } from '@/shared/lib/events';
+import { HelpSheet } from '@/features/help/HelpSheet';
 import type { Task } from '../types';
 import { TopBar } from './TopBar';
 import { Hero } from './Hero';
@@ -26,7 +27,9 @@ export function Dashboard() {
   const isMobile = useIsMobile();
   const [openId, setOpenId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const flashIds = useTaskFlash(tasks);
+  const toggleDone = useToggleDone();
 
   const { buckets, hero, exams, counts } = useMemo(() => {
     const all = tasks ?? [];
@@ -83,6 +86,29 @@ export function Dashboard() {
           description: 'Open Core chat',
           handler: () => emit('open-chat'),
         },
+        // ? → help overlay
+        {
+          key: '?',
+          shift: true,
+          description: 'Show keyboard shortcuts',
+          handler: () => setHelpOpen(true),
+        },
+        // T → toggle hero done
+        {
+          key: 't',
+          description: 'Toggle done on hero task',
+          handler: () => {
+            if (hero) toggleDone(hero);
+          },
+        },
+        // Enter → open hero detail
+        {
+          key: 'enter',
+          description: 'Open hero task detail',
+          handler: () => {
+            if (hero) open(hero);
+          },
+        },
         // Esc → close task panel (palette manages its own)
         {
           key: 'escape',
@@ -90,7 +116,7 @@ export function Dashboard() {
           handler: () => close(),
         },
       ],
-      [close],
+      [close, hero, open, toggleDone],
     ),
   );
 
@@ -136,6 +162,7 @@ export function Dashboard() {
           onOpenTask={open}
           onOpenChat={() => emit('open-chat')}
         />
+        <HelpSheet open={helpOpen} onOpenChange={setHelpOpen} />
       </div>
       </FlashProvider>
     );
@@ -179,6 +206,7 @@ export function Dashboard() {
         onOpenTask={open}
         onOpenChat={() => emit('focus-composer')}
       />
+      <HelpSheet open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
     </FlashProvider>
   );
