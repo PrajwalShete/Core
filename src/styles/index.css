@@ -279,4 +279,22 @@
     0% { transform: scale(0.6); opacity: 0.6; }
     100% { transform: scale(1.6); opacity: 0; }
   }
+
+  /* Item entry — new tasks fade up when they appear. */
+  .item-enter {
+    animation: item-enter 320ms var(--ease-out) both;
+  }
+  @keyframes item-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* Brief accent flash on a panel — used when a row was just updated. */
+  .flash {
+    animation: flash 1.2s var(--ease-out) both;
+  }
+  @keyframes flash {
+    0% { box-shadow: 0 0 0 0 var(--color-accent-glow); border-color: var(--color-accent); }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
 }

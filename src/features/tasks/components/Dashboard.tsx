@@ -4,6 +4,8 @@ import { bucketTasks, pickHero } from '../bucketing';
 import { useNow } from '@/shared/hooks/useNow';
 import { useIsMobile } from '@/shared/hooks/useMediaQuery';
 import { useShortcuts } from '@/shared/hooks/useShortcuts';
+import { useTaskFlash } from '@/shared/hooks/useTaskFlash';
+import { FlashProvider } from '@/shared/lib/flash-context';
 import { emit, on } from '@/shared/lib/events';
 import type { Task } from '../types';
 import { TopBar } from './TopBar';
@@ -24,6 +26,7 @@ export function Dashboard() {
   const isMobile = useIsMobile();
   const [openId, setOpenId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const flashIds = useTaskFlash(tasks);
 
   const { buckets, hero, exams, counts } = useMemo(() => {
     const all = tasks ?? [];
@@ -96,6 +99,7 @@ export function Dashboard() {
    * ──────────────────────────────────────────────────────────────── */
   if (isMobile) {
     return (
+      <FlashProvider value={flashIds}>
       <div className="flex min-h-svh flex-col bg-bg">
         <div className="sticky top-0 z-20 bg-bg pt-safe">
           <div className="px-3 pb-2">
@@ -133,6 +137,7 @@ export function Dashboard() {
           onOpenChat={() => emit('open-chat')}
         />
       </div>
+      </FlashProvider>
     );
   }
 
@@ -140,6 +145,7 @@ export function Dashboard() {
    * Desktop layout
    * ──────────────────────────────────────────────────────────────── */
   return (
+    <FlashProvider value={flashIds}>
     <div className="flex h-svh gap-2 overflow-hidden px-3 pt-3 pb-3 md:gap-2.5 md:px-4 md:pt-4 md:pb-3">
       <div className="flex min-w-0 flex-1 flex-col gap-2 md:gap-2.5">
         <TopBar counts={counts} />
@@ -174,5 +180,6 @@ export function Dashboard() {
         onOpenChat={() => emit('focus-composer')}
       />
     </div>
+    </FlashProvider>
   );
 }

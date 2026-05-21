@@ -1,6 +1,7 @@
 import type { Bucket, Task } from '../types';
 import { bucketOf } from '../bucketing';
 import { fmtWhen } from '@/shared/lib/time';
+import { useIsFlashing } from '@/shared/lib/flash-context';
 import { cn } from '@/shared/lib/cn';
 
 interface Props {
@@ -16,14 +17,16 @@ export function Item({ task, now, bucket, onOpen }: Props) {
   const when = fmtWhen(due, task.is_all_day, b, now);
   const isHigh = task.priority === 'high';
   const isOverdue = b === 'overdue';
+  const isFresh = useIsFlashing(task.id);
 
   return (
     <button
       type="button"
       onClick={() => onOpen(task)}
       className={cn(
-        'group flex w-full cursor-pointer items-start gap-2.5 text-left transition-opacity',
+        'group item-enter relative flex w-full cursor-pointer items-start gap-2.5 text-left transition-opacity',
         task.is_done && 'opacity-35',
+        isFresh && 'before:absolute before:-inset-2 before:rounded-sm before:border before:border-accent/60 before:bg-accent/5 before:animate-pulse before:pointer-events-none',
       )}
     >
       {/* status dot */}
