@@ -1,0 +1,48 @@
+@import 'tailwindcss';
+
+/* ── design tokens ─────────────────────────────────────────────────── */
+@theme {
+  --color-bg: #fafaf6;
+  --color-ink: #0f0f10;
+  --color-ink-soft: #6b6b6e;
+  --color-ink-quiet: #b6b3ac;
+  --color-rule: #e5e2da;
+  --color-accent: #b0522b;
+
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
+}
+
+/* dark mode follows the system preference */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #131210;
+    --color-ink: #f2efe7;
+    --color-ink-soft: #9b978f;
+    --color-ink-quiet: #56534d;
+    --color-rule: #282723;
+    --color-accent: #d87b4d;
+  }
+}
+
+/* ── base ──────────────────────────────────────────────────────────── */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-bg);
+  }
+}
