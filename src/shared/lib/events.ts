@@ -4,13 +4,19 @@
  * desktop sidebar and the mobile launcher without prop drilling.
  */
 
-export type CoreEvent = 'open-chat' | 'focus-composer' | 'open-palette' | 'play-sound';
+export type CoreEvent =
+  | 'open-chat'
+  | 'focus-composer'
+  | 'open-palette'
+  | 'play-sound'
+  | 'core-streaming';
 
 interface EventDetail {
   'open-chat': void;
   'focus-composer': void;
   'open-palette': void;
   'play-sound': { kind: 'tap' | 'success' | 'error' | 'open' | 'boot' };
+  'core-streaming': { active: boolean };
 }
 
 export function emit<K extends CoreEvent>(

@@ -101,6 +101,17 @@ export function CommandPalette({ open, onOpenChange, onOpenTask, onOpenChat }: P
               qc.invalidateQueries();
             }}
           />
+          <PaletteItem
+            value="focus pomodoro 25 minutes"
+            label="Start focus · 25 min"
+            hint="pomodoro"
+            onSelect={() => {
+              close();
+              const end = Date.now() + 25 * 60_000;
+              localStorage.setItem('core_focus_until', String(end));
+              window.dispatchEvent(new StorageEvent('storage', { key: 'core_focus_until' }));
+            }}
+          />
         </Command.Group>
 
         <Command.Group

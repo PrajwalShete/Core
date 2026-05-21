@@ -135,7 +135,7 @@ export function Composer({ onSend, onStop, isStreaming, disabled, autoFocus }: P
 
       <div className="mt-1.5 flex items-center justify-between px-2 text-[0.55rem] font-semibold tracking-[0.22em] text-ink-quiet uppercase">
         <span>⏎ send · ⇧⏎ newline</span>
-        <span>/clear · reset thread</span>
+        <span>/clear · /focus N</span>
       </div>
     </div>
   );

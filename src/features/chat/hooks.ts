@@ -39,7 +39,6 @@ export function useChat() {
       if (!trimmed || isStreaming) return;
 
       // ── slash commands ─────────────────────────────────────────────
-      // Currently only /clear. Match case-insensitive, exact (no args).
       if (/^\/clear\s*$/i.test(trimmed)) {
         try {
           await clearHistory();
@@ -54,12 +53,24 @@ export function useChat() {
         qc.invalidateQueries({ queryKey: CHAT_KEY });
         return;
       }
+      // /focus 25  → start a focus session for N minutes (default 25).
+      const focusMatch = /^\/focus(?:\s+(\d{1,3}))?\s*$/i.exec(trimmed);
+      if (focusMatch) {
+        const mins = focusMatch[1] ? Number(focusMatch[1]) : 25;
+        const end = Date.now() + Math.max(1, Math.min(180, mins)) * 60_000;
+        localStorage.setItem('core_focus_until', String(end));
+        // Force a global re-read by dispatching a storage event.
+        window.dispatchEvent(new StorageEvent('storage', { key: 'core_focus_until' }));
+        emit('play-sound', { kind: 'open' });
+        return;
+      }
 
       setError(null);
       setPendingUser(trimmed);
       setPendingAssistant('');
       setPendingTools([]);
       setIsStreaming(true);
+      emit('core-streaming', { active: true });
 
       const turns: { role: 'user' | 'assistant'; content: string }[] = [
         ...history
@@ -105,6 +116,7 @@ export function useChat() {
         }
       } finally {
         setIsStreaming(false);
+        emit('core-streaming', { active: false });
         setPendingUser(null);
         setPendingAssistant('');
         setPendingTools([]);

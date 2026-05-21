@@ -4,7 +4,8 @@ import { useNow } from '@/shared/hooks/useNow';
 import { useUptime } from '@/shared/hooks/useUptime';
 import { useLatency } from '@/shared/hooks/useLatency';
 import { isSoundEnabled, setSoundEnabled } from '@/shared/lib/sounds';
-import { emit } from '@/shared/lib/events';
+import { emit, on } from '@/shared/lib/events';
+import { FocusBadge } from '@/features/focus/FocusBadge';
 import { cn } from '@/shared/lib/cn';
 
 interface CellProps {
@@ -51,6 +52,9 @@ export function Telemetry() {
   const now = useNow(1000);
   const qc = useQueryClient();
   const [lastSync, setLastSync] = useState<number>(Date.now());
+  const [coreStreaming, setCoreStreaming] = useState(false);
+
+  useEffect(() => on('core-streaming', (d) => setCoreStreaming(!!d?.active)), []);
 
   // Subscribe to react-query cache events: any successful fetch / set
   // counts as a sync, regardless of which query.
@@ -84,8 +88,14 @@ export function Telemetry() {
       <Cell label="Uptime" value={uptime} dot="signal" />
       <Cell label="Link" value={linkValue} dot={linkDot} />
       <Cell label="Sync" value={syncLabel} dot="live" />
-      <Cell label="Core" value="ready · gpt-5.4" dot="signal" mono={false} />
+      <Cell
+        label="Core"
+        value={coreStreaming ? 'streaming · gpt-5.4' : 'ready · gpt-5.4'}
+        dot={coreStreaming ? 'live' : 'signal'}
+        mono={false}
+      />
       <div className="flex flex-1 items-center justify-end gap-3 px-3 py-1.5">
+        <FocusBadge />
         <SoundToggle />
         <span className="text-[0.55rem] font-semibold tracking-[0.28em] text-ink-quiet uppercase">
           ⌘K · Command

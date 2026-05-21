@@ -205,6 +205,7 @@ Each step auto-submits on 4-digit input — no Enter required.
 | Command | Effect |
 |---|---|
 | `/clear` | Deletes all `chat_messages` rows. Sidebar resets to empty state. Because the AI's context is rebuilt from the DB each turn, the model also forgets. |
+| `/focus N` | Start a focus session for N minutes (default 25). Persists to localStorage so refresh doesn't lose it. A FocusBadge appears in the Telemetry strip; success chime when the timer completes. |
 
 Adding more: extend the regex check in `src/features/chat/hooks.ts:send`. The shape is set up for it.
 
@@ -224,6 +225,35 @@ The model is instructed (in `prompt.ts`) to:
 - IST defaults if no time given (09:00 morning, 18:00 evening, 23:00 EOD).
 - Echo task titles in **bold** when confirming.
 - Match Prajwal's terseness.
+
+## Cockpit / JARVIS layer
+
+The dashboard isn't just a list — it's framed as a personal control center. Pieces:
+
+| Surface | Where | What it does |
+|---|---|---|
+| Boot sequence | `src/features/boot/Boot.tsx` | 5-stage init streamed across the screen between gate unlock and dashboard, finishes with "READY · HH:MM:SS" + a "boot" chime. |
+| Time-aware greeting | `src/shared/lib/greeting.ts` | Renders in Hero empty state — "Good evening, Prajwal." plus a situational subtitle. |
+| Telemetry strip | `src/features/telemetry/Telemetry.tsx` | Uptime, live-pinged Supabase RTT (`useLatency`), last-sync indicator, Core ready/streaming, focus badge, sound toggle. Desktop-only. |
+| Mission timer | `src/features/tasks/components/MissionTimer.tsx` | T-minus to next exam, dd:hh:mm:ss ticking. |
+| Command palette | `src/features/palette/CommandPalette.tsx` | cmdk-powered. ⌘K / Ctrl+K opens; mobile gets a ⌘ button in the TopBar. Searches tasks, runs actions (open chat, /clear, focus 25, refresh). |
+| Global shortcuts | `src/shared/hooks/useShortcuts.ts` | ⌘K palette, `/` open chat, Esc close. |
+| Voice input | `src/shared/hooks/useSpeechRecognition.ts` + Composer mic button | Push-to-talk via Web Speech API. Live interim transcript, finals appended to textarea. Hidden in unsupported browsers. |
+| Sound | `src/shared/lib/sounds.ts` + `useSoundBus` | Synthesized via Web Audio API. Off by default; toggle in Telemetry. |
+| Focus mode | `src/features/focus/{useFocus,FocusBadge}.tsx` | `/focus N` slash command, persistent badge, completion chime. |
+| Item entry + flash | `useTaskFlash` + `FlashProvider` | Tasks fade up on mount; rows briefly accent-flash when their `updated_at` advances. |
+| Background ambient | `src/styles/index.css` | Radial accent vignette + faint 56px CSS grid, blend-mode soft-light. |
+| Motion vocabulary | CSS tokens | `--ease-out`, `--dur-base`, `pulse-ring`, `scan-drift`, `item-enter`, `flash`. All gated on `prefers-reduced-motion`. |
+
+### Event bus
+
+`src/shared/lib/events.ts` — `emit(name, detail)` / `on(name, handler)`. Used by components that need to talk across the tree without prop drilling:
+
+- `open-chat` — mobile launcher opens its drawer; desktop sidebar expands.
+- `focus-composer` — desktop sidebar focuses the textarea on next render.
+- `open-palette` — opens the command palette from any surface.
+- `play-sound` — global sound bus listens and synthesizes the requested chime.
+- `core-streaming` — chat hook emits while Codex is responding; Telemetry pulses the Core indicator.
 
 ## Live context injection
 
