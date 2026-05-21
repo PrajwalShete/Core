@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTasks, useToggleDone } from '../hooks';
 import { bucketTasks, pickHero } from '../bucketing';
 import { useNow } from '@/shared/hooks/useNow';
@@ -7,7 +7,14 @@ import { useShortcuts } from '@/shared/hooks/useShortcuts';
 import { useTaskFlash } from '@/shared/hooks/useTaskFlash';
 import { FlashProvider } from '@/shared/lib/flash-context';
 import { emit, on } from '@/shared/lib/events';
-import { HelpSheet } from '@/features/help/HelpSheet';
+
+// Lazy — these chunks only download when the user actually opens them.
+const CommandPaletteLazy = lazy(() =>
+  import('@/features/palette/CommandPalette').then((m) => ({ default: m.CommandPalette })),
+);
+const HelpSheetLazy = lazy(() =>
+  import('@/features/help/HelpSheet').then((m) => ({ default: m.HelpSheet })),
+);
 import type { Task } from '../types';
 import { TopBar } from './TopBar';
 import { Hero } from './Hero';
@@ -19,7 +26,6 @@ import { TaskPanel } from './TaskPanel';
 import { ChatSidebar } from '@/features/chat/components/Sidebar';
 import { ChatLauncher } from '@/features/chat/components/ChatLauncher';
 import { Telemetry } from '@/features/telemetry/Telemetry';
-import { CommandPalette } from '@/features/palette/CommandPalette';
 
 export function Dashboard() {
   const { data: tasks, isLoading, error } = useTasks();
@@ -156,13 +162,19 @@ export function Dashboard() {
 
         <ChatLauncher />
         <TaskPanel task={openTask} onClose={close} />
-        <CommandPalette
-          open={paletteOpen}
-          onOpenChange={setPaletteOpen}
-          onOpenTask={open}
-          onOpenChat={() => emit('open-chat')}
-        />
-        <HelpSheet open={helpOpen} onOpenChange={setHelpOpen} />
+        <Suspense fallback={null}>
+          {(paletteOpen || helpOpen) && (
+            <>
+              <CommandPaletteLazy
+                open={paletteOpen}
+                onOpenChange={setPaletteOpen}
+                onOpenTask={open}
+                onOpenChat={() => emit('open-chat')}
+              />
+              <HelpSheetLazy open={helpOpen} onOpenChange={setHelpOpen} />
+            </>
+          )}
+        </Suspense>
       </div>
       </FlashProvider>
     );
@@ -200,13 +212,19 @@ export function Dashboard() {
 
       <ChatSidebar />
       <TaskPanel task={openTask} onClose={close} />
-      <CommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        onOpenTask={open}
-        onOpenChat={() => emit('focus-composer')}
-      />
-      <HelpSheet open={helpOpen} onOpenChange={setHelpOpen} />
+      <Suspense fallback={null}>
+        {(paletteOpen || helpOpen) && (
+          <>
+            <CommandPaletteLazy
+              open={paletteOpen}
+              onOpenChange={setPaletteOpen}
+              onOpenTask={open}
+              onOpenChat={() => emit('focus-composer')}
+            />
+            <HelpSheetLazy open={helpOpen} onOpenChange={setHelpOpen} />
+          </>
+        )}
+      </Suspense>
     </div>
     </FlashProvider>
   );

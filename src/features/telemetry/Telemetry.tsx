@@ -5,6 +5,7 @@ import { useUptime } from '@/shared/hooks/useUptime';
 import { useLatency } from '@/shared/hooks/useLatency';
 import { isSoundEnabled, setSoundEnabled } from '@/shared/lib/sounds';
 import { emit, on } from '@/shared/lib/events';
+import { useTheme } from '@/shared/hooks/useTheme';
 import { FocusBadge } from '@/features/focus/FocusBadge';
 import { cn } from '@/shared/lib/cn';
 
@@ -97,11 +98,31 @@ export function Telemetry() {
       <div className="flex flex-1 items-center justify-end gap-3 px-3 py-1.5">
         <FocusBadge />
         <SoundToggle />
+        <ThemeToggle />
         <span className="text-[0.55rem] font-semibold tracking-[0.28em] text-ink-quiet uppercase">
           ⌘K · Command
         </span>
       </div>
     </section>
+  );
+}
+
+function ThemeToggle() {
+  const { mode, setMode, isDark } = useTheme();
+  // Cycle system → light → dark → system
+  const next = mode === 'system' ? 'light' : mode === 'light' ? 'dark' : 'system';
+  return (
+    <button
+      type="button"
+      onClick={() => setMode(next)}
+      title={`Theme: ${mode} — click for ${next}`}
+      className="flex cursor-pointer items-center gap-1.5 text-[0.55rem] font-semibold tracking-[0.24em] text-ink-soft uppercase hover:text-ink"
+    >
+      <span aria-hidden className="font-mono text-[0.78rem] leading-none">
+        {isDark ? '◐' : '◑'}
+      </span>
+      <span>{mode}</span>
+    </button>
   );
 }
 

@@ -55,6 +55,23 @@ export function useFocus(): FocusState & {
       localStorage.removeItem(KEY);
       setEndsAt(null);
       emit('play-sound', { kind: 'success' });
+      // Desktop notification when the tab is hidden — Core lets you know.
+      if (
+        typeof Notification !== 'undefined' &&
+        Notification.permission === 'granted' &&
+        document.visibilityState === 'hidden'
+      ) {
+        try {
+          new Notification('Focus complete', {
+            body: 'The session has finished. Welcome back.',
+            icon: '/favicon.svg',
+            tag: 'core-focus',
+            silent: false,
+          });
+        } catch {
+          /* ignore notification failures */
+        }
+      }
     }
   }, [now, endsAt]);
 
@@ -64,6 +81,14 @@ export function useFocus(): FocusState & {
     localStorage.setItem(KEY, String(end));
     setEndsAt(end);
     emit('play-sound', { kind: 'open' });
+    // Request notification permission once — no harm if user denies.
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      try {
+        void Notification.requestPermission();
+      } catch {
+        /* ignore */
+      }
+    }
   };
 
   const stop = () => {
