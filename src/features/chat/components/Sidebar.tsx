@@ -3,6 +3,7 @@ import { useChat } from '../hooks';
 import { Message } from './Message';
 import { Composer } from './Composer';
 import { ToolChip } from './ToolChip';
+import { on } from '@/shared/lib/events';
 import { cn } from '@/shared/lib/cn';
 
 export function ChatSidebar() {
@@ -18,6 +19,7 @@ export function ChatSidebar() {
     stop,
   } = useChat();
   const listRef = useRef<HTMLDivElement>(null);
+  const [focusBump, setFocusBump] = useState(0);
 
   // Scroll to bottom whenever new content arrives.
   useEffect(() => {
@@ -25,6 +27,23 @@ export function ChatSidebar() {
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [history.length, pendingAssistant, pendingUser, pendingTools.length]);
+
+  // External signals — open-chat expands the sidebar; focus-composer
+  // ensures the textarea grabs focus on the next render.
+  useEffect(() => {
+    const offOpen = on('open-chat', () => {
+      setOpen(true);
+      setFocusBump((n) => n + 1);
+    });
+    const offFocus = on('focus-composer', () => {
+      setOpen(true);
+      setFocusBump((n) => n + 1);
+    });
+    return () => {
+      offOpen();
+      offFocus();
+    };
+  }, []);
 
   if (!open) {
     return (
@@ -132,7 +151,13 @@ export function ChatSidebar() {
         )}
       </div>
 
-      <Composer onSend={send} onStop={stop} isStreaming={isStreaming} />
+      <Composer
+        key={focusBump}
+        onSend={send}
+        onStop={stop}
+        isStreaming={isStreaming}
+        autoFocus={focusBump > 0}
+      />
     </aside>
   );
 }

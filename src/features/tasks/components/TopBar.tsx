@@ -1,6 +1,8 @@
 import { useNow } from '@/shared/hooks/useNow';
 import { useIsMobile } from '@/shared/hooks/useMediaQuery';
+import { useAnimatedNumber } from '@/shared/hooks/useAnimatedNumber';
 import { DOWS_UPPER, MONTHS_UPPER } from '@/shared/lib/time';
+import { emit } from '@/shared/lib/events';
 import { cn } from '@/shared/lib/cn';
 
 interface Counts {
@@ -19,21 +21,22 @@ interface PillProps {
 }
 
 function Pill({ label, value, accent, muted, compact }: PillProps) {
+  const animated = useAnimatedNumber(value);
   return (
     <div
       className={cn(
-        'flex shrink-0 items-baseline gap-2',
+        'flex shrink-0 items-baseline gap-2 transition-colors duration-300',
         compact ? 'px-2.5 py-1.5' : 'px-3 py-2 md:px-4',
       )}
     >
       <span
         className={cn(
-          'leading-none font-bold tracking-[-0.02em] tabular-nums',
+          'leading-none font-bold tracking-[-0.02em] tabular-nums transition-colors',
           compact ? 'text-[1.1rem]' : 'text-[1.4rem]',
           accent ? 'text-accent' : muted ? 'text-ink-quiet' : 'text-ink',
         )}
       >
-        {String(value).padStart(2, '0')}
+        {String(animated).padStart(2, '0')}
       </span>
       <span
         className={cn(
@@ -77,13 +80,24 @@ export function TopBar({ counts }: { counts: Counts }) {
               {dow}
             </span>
           </div>
-          <div className="flex items-baseline gap-1.5 leading-none">
-            <span className="text-[1.05rem] font-light tracking-[-0.02em] text-ink tabular-nums">
-              {hh}:{mm}
-            </span>
-            <span className="text-[0.56rem] font-semibold tracking-[0.24em] text-accent uppercase">
-              {meridiem}
-            </span>
+          <div className="flex items-center gap-3 leading-none">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-[1.05rem] font-light tracking-[-0.02em] text-ink tabular-nums">
+                {hh}:{mm}
+              </span>
+              <span className="text-[0.56rem] font-semibold tracking-[0.24em] text-accent uppercase">
+                {meridiem}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => emit('open-palette')}
+              title="Command palette"
+              aria-label="Command palette"
+              className="flex size-[26px] cursor-pointer items-center justify-center border border-rule text-[0.6rem] font-semibold tracking-[0.12em] text-ink-soft uppercase transition-colors hover:border-ink hover:text-ink"
+            >
+              ⌘
+            </button>
           </div>
         </div>
         {/* bottom row: scrollable pills */}

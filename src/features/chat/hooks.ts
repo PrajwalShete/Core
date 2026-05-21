@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clearHistory, fetchHistory, streamChat, type ToolCallEvent, type ToolResultEvent } from './api';
+import { emit } from '@/shared/lib/events';
 import type { ChatMessage } from './types';
 
 export const CHAT_KEY = ['chat-history'] as const;
@@ -78,7 +79,8 @@ export function useChat() {
               ...prev,
               { ...e, status: 'running' },
             ]),
-          onToolResult: (e: ToolResultEvent) =>
+          onToolResult: (e: ToolResultEvent) => {
+            emit('play-sound', { kind: e.ok ? 'success' : 'error' });
             setPendingTools((prev) =>
               prev.map((t) =>
                 t.call_id === e.call_id
@@ -90,8 +92,12 @@ export function useChat() {
                     }
                   : t,
               ),
-            ),
-          onError: (msg) => setError(msg),
+            );
+          },
+          onError: (msg) => {
+            emit('play-sound', { kind: 'error' });
+            setError(msg);
+          },
         });
       } catch (e) {
         if ((e as Error).name !== 'AbortError') {

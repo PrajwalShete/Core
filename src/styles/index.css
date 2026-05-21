@@ -1,26 +1,47 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 /* ── design tokens ─────────────────────────────────────────────────── */
 @theme {
   --color-bg: #fafaf6;
+  --color-bg-deep: #f3f1e9;
   --color-ink: #0f0f10;
   --color-ink-soft: #6b6b6e;
   --color-ink-quiet: #b6b3ac;
   --color-rule: #e5e2da;
+  --color-rule-strong: #d4d0c5;
   --color-accent: #b0522b;
+  --color-accent-glow: rgba(176, 82, 43, 0.18);
+  --color-signal: #2e7d32;
+  --color-signal-glow: rgba(46, 125, 50, 0.18);
+
+  /* Motion tokens. Use these instead of ad-hoc cubic-beziers so every
+     transition feels related to every other. */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.7, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 420ms;
 
   --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
 }
 
 /* dark mode follows the system preference */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #131210;
+    --color-bg: #0a0908;
+    --color-bg-deep: #050403;
     --color-ink: #f2efe7;
     --color-ink-soft: #9b978f;
     --color-ink-quiet: #56534d;
-    --color-rule: #282723;
-    --color-accent: #d87b4d;
+    --color-rule: #1f1d1a;
+    --color-rule-strong: #2c2925;
+    --color-accent: #ff7a45;
+    --color-accent-glow: rgba(255, 122, 69, 0.22);
+    --color-signal: #44d18f;
+    --color-signal-glow: rgba(68, 209, 143, 0.18);
   }
 }
 
@@ -29,9 +50,6 @@
   html,
   body,
   #root {
-    /* svh is the *stable* mobile viewport height — does not reflow when
-       the URL bar animates. dvh elsewhere only where we *want* to track
-       the dynamic viewport (e.g. the chat sheet). */
     min-height: 100svh;
     background: var(--color-bg);
     color: var(--color-ink);
@@ -39,20 +57,44 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
 
-    /* Make taps feel native — no 300ms delay, no blue flash. */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
   }
 
   body {
     margin: 0;
-    /* Prevent rubber-band scrolling into the browser chrome when the
-       inner content reaches its scroll limits. */
     overscroll-behavior: none;
+
+    /* ─ cinematic background ─
+       A faint radial vignette + a near-imperceptible grid. Layered behind
+       everything via the body so panels feel like they float over depth. */
+    background-image:
+      radial-gradient(
+        ellipse 80% 60% at 50% 30%,
+        var(--color-accent-glow) 0%,
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse 60% 50% at 50% 100%,
+        var(--color-bg-deep) 0%,
+        transparent 60%
+      ),
+      linear-gradient(var(--color-rule) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-rule) 1px, transparent 1px);
+    background-size: auto, auto, 56px 56px, 56px 56px;
+    background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+    background-attachment: fixed, fixed, fixed, fixed;
+    background-color: var(--color-bg);
+    background-blend-mode: normal, normal, soft-light, soft-light;
   }
 
-  /* Chrome elements (panel headers, footers, the topbar) shouldn't be
-     selectable — but content (titles, message text) should. */
+  /* In light mode the grid is too visible — dampen it. */
+  @media (prefers-color-scheme: light) {
+    body {
+      background-blend-mode: normal, normal, multiply, multiply;
+    }
+  }
+
   button,
   [role='button'] {
     touch-action: manipulation;
@@ -64,25 +106,31 @@
     color: var(--color-bg);
   }
 
-  /* Smoother scrolling on iOS. */
   * {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Hide native scrollbars only inside .scrollx (horizontal scrolling
-     status pills / exam tape on mobile look better without them). */
   .scrollx::-webkit-scrollbar {
     display: none;
   }
   .scrollx {
     scrollbar-width: none;
   }
+
+  /* Honor reduced motion globally. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 /* ── utilities ─────────────────────────────────────────────────────── */
 @layer utilities {
-  /* Safe-area-aware padding. Use these on the topbar (top), composer bar
-     (bottom), and the chat sheet handle. */
   .pt-safe {
     padding-top: max(0.5rem, env(safe-area-inset-top));
   }
@@ -104,16 +152,26 @@
   .min-h-svh {
     min-height: 100svh;
   }
+
+  /* Mono numerals for telemetry/timers. */
+  .font-mono {
+    font-family: var(--font-mono);
+  }
 }
 
 /* ── components ────────────────────────────────────────────────────── */
 @layer components {
-  /* a cockpit panel: hairline border, square corners, no padding so the
-     content controls its own rhythm. Use .panel-pad to add a default inset. */
+  /* a cockpit panel: hairline border, square corners, slight backdrop */
   .panel {
     border: 1px solid var(--color-rule);
-    background: var(--color-bg);
+    background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     position: relative;
+    transition: border-color var(--dur-base) var(--ease-out);
+  }
+  .panel:hover {
+    border-color: var(--color-rule-strong);
   }
   .panel-pad {
     padding: 0.9rem 1.05rem;
@@ -141,7 +199,7 @@
     text-transform: uppercase;
     font-variant-numeric: tabular-nums;
   }
-  /* corner ticks — tiny cockpit-y accents at the panel corners */
+  /* corner ticks — tiny cockpit-y accents */
   .panel-ticks::before,
   .panel-ticks::after {
     content: '';
@@ -161,5 +219,64 @@
     right: -1px;
     border-bottom: 1px solid;
     border-right: 1px solid;
+  }
+
+  /* A subtle horizontal scan line that drifts across active panels.
+     Add `.scan` to opt in. Only renders when motion is allowed. */
+  .scan::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 49%,
+      color-mix(in srgb, var(--color-accent) 12%, transparent) 50%,
+      transparent 51%,
+      transparent 100%
+    );
+    background-size: 100% 220%;
+    animation: scan-drift 7s linear infinite;
+    opacity: 0.5;
+    mix-blend-mode: screen;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scan::after {
+      display: none;
+    }
+  }
+  @keyframes scan-drift {
+    0% { background-position: 0 -110%; }
+    100% { background-position: 0 110%; }
+  }
+
+  /* Pulsing dot used for status indicators / "live" markers. */
+  .pulse-dot {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--color-accent);
+  }
+  .pulse-dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: inherit;
+    background: var(--color-accent);
+    opacity: 0.35;
+    animation: pulse-ring 1.8s ease-out infinite;
+  }
+  .pulse-dot.signal {
+    background: var(--color-signal);
+  }
+  .pulse-dot.signal::after {
+    background: var(--color-signal);
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(0.6); opacity: 0.6; }
+    100% { transform: scale(1.6); opacity: 0; }
   }
 }

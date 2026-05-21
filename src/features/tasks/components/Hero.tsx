@@ -1,30 +1,38 @@
 import { bucketOf } from '../bucketing';
 import type { Task } from '../types';
 import { fmtCountdown, fmtTimeOfDay } from '@/shared/lib/time';
+import { greeting } from '@/shared/lib/greeting';
+import { useNow } from '@/shared/hooks/useNow';
 import { cn } from '@/shared/lib/cn';
 
 interface Props {
   task: Task | null;
   now: Date;
   onOpen: (task: Task) => void;
+  /** Empty-state context, used for the time-aware greeting line. */
+  emptyContext?: {
+    counts: { today: number; done: number; overdue: number; ahead: number };
+  };
 }
 
-export function Hero({ task, now, onOpen }: Props) {
+export function Hero({ task, now, onOpen, emptyContext }: Props) {
   if (!task) {
+    const g = greeting({
+      now,
+      counts: emptyContext?.counts ?? { today: 0, done: 0, overdue: 0, ahead: 0 },
+    });
     return (
-      <section className="panel shrink-0">
+      <section className="panel panel-ticks shrink-0">
         <div className="panel-head">
-          <span className="panel-eyebrow">Nothing pressing</span>
+          <span className="panel-eyebrow">Standing by</span>
           <span className="panel-badge">— —</span>
         </div>
-        <div className="flex min-h-[7.5rem] items-center px-4 py-4 md:px-5">
-          <div>
-            <div className="text-[clamp(1.8rem,3.4vw,3rem)] leading-[0.98] font-bold tracking-[-0.045em] text-ink-soft">
-              All clear.
-            </div>
-            <div className="mt-2 text-[0.85rem] font-medium text-ink-quiet">
-              Enjoy the quiet.
-            </div>
+        <div className="px-4 py-4 md:px-5 md:py-5">
+          <div className="text-[clamp(1.5rem,3.4vw,3rem)] leading-[1.02] font-bold tracking-[-0.04em] text-ink">
+            {g.salute}
+          </div>
+          <div className="mt-2 text-[0.92rem] font-medium tracking-[-0.005em] text-ink-soft">
+            {g.line}
           </div>
         </div>
       </section>
@@ -32,6 +40,10 @@ export function Hero({ task, now, onOpen }: Props) {
   }
 
   const due = new Date(task.due_at);
+  // Live-tick the countdown text at 1 Hz independently of the parent's
+  // 60s re-bucket cadence. The countdown feels alive without re-running
+  // expensive bucketing every second.
+  const fastNow = useNow(1000);
   const bucket = bucketOf(due, now);
   const kicker =
     bucket === 'overdue'
@@ -41,11 +53,11 @@ export function Hero({ task, now, onOpen }: Props) {
         : bucket === 'tomorrow'
           ? 'Tomorrow'
           : 'Coming up';
-  const countdown = fmtCountdown(due, task.is_all_day, bucket, now);
+  const countdown = fmtCountdown(due, task.is_all_day, bucket, fastNow);
   const timeStr = !task.is_all_day ? fmtTimeOfDay(due) : null;
 
   return (
-    <section className="panel panel-ticks shrink-0">
+    <section className="panel panel-ticks scan shrink-0">
       <div className="panel-head">
         <span className={cn('panel-eyebrow', bucket === 'overdue' && 'text-accent')}>
           {kicker}

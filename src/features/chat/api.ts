@@ -22,7 +22,10 @@ export async function fetchHistory(): Promise<ChatMessage[]> {
     .order('created_at', { ascending: true })
     .limit(500);
   if (error) throw error;
-  return (data ?? []).map((m) => ({
+  // Supabase's inferred row type for a custom select is opaque to us;
+  // we cast through unknown into the shape we wrote into the table.
+  const rows = (data ?? []) as unknown as Array<Omit<ChatMessage, 'content'> & { content: unknown }>;
+  return rows.map((m) => ({
     ...m,
     content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
   }));
@@ -89,8 +92,8 @@ export async function streamChat(args: StreamArgs): Promise<void> {
       for (const line of frame.split('\n')) {
         const e = line.match(/^event:\s*(.*)$/);
         const d = line.match(/^data:\s*(.*)$/);
-        if (e) evt = e[1].trim();
-        if (d) data = d[1];
+        if (e?.[1] !== undefined) evt = e[1].trim();
+        if (d?.[1] !== undefined) data = d[1];
       }
       if (!data) continue;
 

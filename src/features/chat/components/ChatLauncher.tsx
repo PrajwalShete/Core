@@ -4,6 +4,7 @@ import { useChat } from '../hooks';
 import { Message } from './Message';
 import { Composer } from './Composer';
 import { ToolChip } from './ToolChip';
+import { on } from '@/shared/lib/events';
 import { cn } from '@/shared/lib/cn';
 
 /**
@@ -33,6 +34,11 @@ export function ChatLauncher() {
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [open, history.length, pendingAssistant, pendingUser, pendingTools.length]);
+
+  // External signal — e.g. `/` shortcut or palette command opens chat.
+  useEffect(() => {
+    return on('open-chat', () => setOpen(true));
+  }, []);
 
   return (
     <>
