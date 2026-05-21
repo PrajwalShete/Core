@@ -82,8 +82,9 @@ export function Composer({ onSend, onStop, isStreaming, disabled, autoFocus }: P
           </button>
         )}
       </div>
-      <div className="mt-1.5 px-2 text-[0.55rem] font-semibold tracking-[0.22em] text-ink-quiet uppercase">
-        ⏎ send · ⇧⏎ newline
+      <div className="mt-1.5 flex items-center justify-between px-2 text-[0.55rem] font-semibold tracking-[0.22em] text-ink-quiet uppercase">
+        <span>⏎ send · ⇧⏎ newline</span>
+        <span>/clear · reset thread</span>
       </div>
     </div>
   );

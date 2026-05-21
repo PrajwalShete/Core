@@ -7,7 +7,7 @@
 **Core** is a single-user task dashboard for Prajwal Shete (engineering student, India, currently in exam season). It has two parts:
 
 1. **The dashboard** — a cockpit-style view of his day. Tasks, comments, an exam tape strip across the bottom.
-2. **The Core sidebar** — an AI co-pilot that lives in a right-side panel (or a bottom sheet on mobile). It talks to ChatGPT via the official `codex` OAuth chain and answers questions about the day. Read-only for now — tool use (write actions) is the next planned upgrade.
+2. **The Core sidebar** — an AI co-pilot that lives in a right-side panel, talks to ChatGPT via the official `codex` OAuth chain, and can actually mutate the database through tool use.
 
 Stack: **Vite + React + TypeScript + Tailwind v4** on the front, **Supabase Postgres + Edge Functions (Deno)** on the back, **GPT-5.2 → 5.4** via the **ChatGPT Codex backend** (subscription auth, not API key).
 
@@ -26,7 +26,7 @@ Stack: **Vite + React + TypeScript + Tailwind v4** on the front, **Supabase Post
 |---|---|---|
 | `tasks` | The 16+ tasks Prajwal tracks. Drives the dashboard. | `ALL` allowed (gated by app password) |
 | `comments` | Threaded comments per task. | `ALL` allowed |
-| `chat_messages` | Persistent Core thread. `content` is jsonb (usually a string). The table already has unused `tool_calls`/`tool_results` jsonb columns — reserved for the upcoming tool-use upgrade. | SELECT, INSERT allowed |
+| `chat_messages` | Persistent Core thread. `content` is jsonb (usually a string), `tool_calls`/`tool_results` are jsonb arrays for role=`tool` rows. | SELECT, INSERT, DELETE allowed |
 | `oauth_tokens` | Rotating Codex access+refresh+expires+account_id. Single row keyed on `provider='openai_codex'`. | **No anon policy — service-role only.** |
 
 Migrations live in **two places** for historical reasons:
@@ -37,8 +37,9 @@ Current applied migrations:
 1. `0001_init` — tasks + comments + RLS + realtime publication
 2. `0002_chat_messages` — chat thread table
 3. `0003_oauth_tokens` — Codex token storage
+4. `0004_chat_delete_policy` — anon DELETE so `/clear` works
 
-**Drift to know about:** the remote DB ALSO has migration `20260522030000_chat_delete_policy` applied (anon DELETE on `chat_messages`) — pushed during local development but not yet committed to git. Future tool-use commit will land it. Also: a one-off `20260522000400_seed_codex_token.sql` was applied then **reverted in history** (`supabase migration repair --status reverted`) — so a fresh `db push` may complain about that ID and need a repair before it proceeds. Same pattern when applying a future seed.
+A migration `20260522000400_seed_codex_token.sql` was once applied to seed credentials, then **reverted in history** (`supabase migration repair --status reverted`) — that's why a fresh `db push` may complain and need a repair before it proceeds. Same pattern when applying a future seed.
 
 ## How the AI auth works (READ THIS)
 
@@ -114,15 +115,37 @@ supabase secrets set OPENAI_CODEX_REFRESH_TOKEN='rt_...'
 
 | File | Role |
 |---|---|
-| `index.ts` | HTTP handler. Token refresh, Codex streaming, persistence. |
+| `index.ts` | HTTP handler. Token refresh, tool loop, custom SSE event stream, persistence. |
 | `codex.ts` | OAuth client + Codex backend caller. Has CLIENT_ID, TOKEN_URL, CODEX_BASE constants. |
 | `prompt.ts` | `SYSTEM_PROMPT` (Core's identity/voice/rules) + `buildContext()` (per-turn live state injector). |
+| `tools.ts` | Tool definitions (`add_task`, `mark_done`, `edit_task`, `delete_task`, `add_comment`) + executor. |
 
 **Deploy:** `supabase functions deploy chat --no-verify-jwt`
 
 **Function URL:** `https://hhqdmolvgljzgonddrvn.supabase.co/functions/v1/chat`
 
-The function tees Codex's SSE stream directly to the client (vendor format, e.g. `response.output_text.delta` events) and persists the final assistant text to `chat_messages` after the stream completes. Read-only — no tool execution yet.
+### SSE event protocol (function → browser)
+
+Every chat request returns `text/event-stream`. Frame format is standard SSE, with these `event:` types:
+
+| Event | Data |
+|---|---|
+| `delta` | `{ text: string }` — chunk of assistant text |
+| `tool_call` | `{ call_id, name, args }` — model invoked a Supabase tool |
+| `tool_result` | `{ call_id, name, ok, data?, error? }` — tool finished |
+| `error` | `{ message }` |
+| `done` | `{}` — final marker |
+
+Client parses these in `src/features/chat/api.ts:streamChat`.
+
+### Tool loop
+
+Up to `MAX_TOOL_TURNS = 6` round trips. Each turn:
+1. Codex returns text deltas + possibly `function_call` items.
+2. Function executes each tool against Supabase, emits `tool_call` + `tool_result` events, appends `function_call_output` items to the next input.
+3. Loop terminates when the model stops emitting function calls.
+
+**Schema strict mode quirk:** when `strict: true` on a tool, Codex requires `required` to include every property name. For patch-style tools (`edit_task`), use nullable types (`type: ['string','null']`) for each field and list all keys as required. See `tools.ts:TASK_FIELDS_PATCHABLE`.
 
 ## The frontend
 
@@ -145,14 +168,14 @@ src/
 │   │       ├── TaskPanel.tsx — click-to-open detail panel with comment thread
 │   │       └── Footer.tsx    — live indicator + hint strip
 │   └── chat/
-│       ├── api.ts            — streamChat, fetchHistory
-│       ├── hooks.ts          — useChat (manages pending state)
+│       ├── api.ts            — streamChat, fetchHistory, clearHistory
+│       ├── hooks.ts          — useChat (manages pending state + slash commands)
 │       ├── types.ts
 │       └── components/
-│           ├── Sidebar.tsx        — desktop: collapsible right panel
-│           ├── ChatLauncher.tsx   — mobile: docked bar + vaul bottom sheet
-│           ├── Message.tsx        — bubble (YOU / CORE eyebrow + content)
-│           └── Composer.tsx       — autosize textarea, ⏎ send / ⇧⏎ newline
+│           ├── Sidebar.tsx   — collapsible right panel, message list, error state
+│           ├── Message.tsx   — bubble (YOU / CORE eyebrow + content)
+│           ├── ToolChip.tsx  — inline chip while a tool is running / after completion
+│           └── Composer.tsx  — autosize textarea, ⏎ send / ⇧⏎ newline, /clear hint
 ├── shared/
 │   ├── lib/supabase.ts       — client (uses anon key from env)
 │   ├── lib/cn.ts             — class name helper
@@ -177,13 +200,30 @@ Two-step, hard-coded in env:
 
 Each step auto-submits on 4-digit input — no Enter required.
 
-## What Core can do (right now)
+## Slash commands
 
-- Answer questions grounded in the live task list + comments injected each turn.
-- Suggest priorities, study plans, breakdowns.
-- Format new task entries Prajwal can paste (fenced \`task\` block + matching SQL).
+| Command | Effect |
+|---|---|
+| `/clear` | Deletes all `chat_messages` rows. Sidebar resets to empty state. Because the AI's context is rebuilt from the DB each turn, the model also forgets. |
 
-It **cannot** mutate the DB yet — that ships in the tool-use upgrade (see "What's intentionally NOT built yet"). The system prompt explicitly tells the model not to pretend it did so.
+Adding more: extend the regex check in `src/features/chat/hooks.ts:send`. The shape is set up for it.
+
+## What Core can do (tool set)
+
+| Tool | Mutates | When |
+|---|---|---|
+| `add_task` | INSERT into `tasks` | "add", "remind", "schedule", "queue" |
+| `mark_done` | UPDATE `tasks.is_done` | "mark done", "complete", "reopen" |
+| `edit_task` | UPDATE `tasks.<fields>` | "change", "update", "move" |
+| `delete_task` | DELETE FROM `tasks` | only on explicit "delete"/"remove" |
+| `add_comment` | INSERT into `comments` | "comment that", "log that" |
+
+The model is instructed (in `prompt.ts`) to:
+- **Just do it** — no asking for confirmation, no dumping SQL.
+- Use kebab-case ids derived from the title.
+- IST defaults if no time given (09:00 morning, 18:00 evening, 23:00 EOD).
+- Echo task titles in **bold** when confirming.
+- Match Prajwal's terseness.
 
 ## Live context injection
 
@@ -202,7 +242,8 @@ Every chat turn, the function fetches the full task list + last 25 comments and 
 2. **Don't paste tokens (refresh, access, JWT) into chat messages.** They're working credentials. If a token must be shared, rotate it after.
 3. **Don't change the `originator` header.** Removing or modifying `codex_cli_rs` will get the Codex backend to reject the request as not-a-real-CLI.
 4. **Don't request `gpt-5.1`, `gpt-5-codex`, `gpt-5.2-codex` etc.** on the ChatGPT Go plan — they're paywalled. Stick with `gpt-5.2` (routes to 5.4).
-5. **Don't put `instructions` in the input items.** It belongs in the top-level `instructions` field of the request — putting it inline disables prompt caching.
+5. **Don't make tool params `strict: true` without making every key required.** Codex rejects the schema otherwise. For patchy fields use nullable types.
+6. **Don't put `instructions` in the input items.** It belongs in the top-level `instructions` field of the request — putting it inline disables prompt caching.
 
 ## Mobile / PWA
 
@@ -240,8 +281,8 @@ Foundation pieces (don't break these):
 
 (Per Prajwal's scope choices — don't bolt these on without asking.)
 
-- **Tool use** — Core can't mutate the DB yet. Function-calling + SSE tool events + UI chips + `/clear` slash command + DB delete policy are all wired up locally on a separate uncommitted commit; ship that next.
 - Voice input
+- Slash command palette beyond `/clear`
 - Multi-user support (chat is single global thread)
 - Personality / settings UI
 - Realtime subscription on `chat_messages` (we refetch instead — works fine for single-user)
@@ -255,4 +296,5 @@ Foundation pieces (don't break these):
 
 - **Edge function holding tokens** — clean separation, OpenAI key never leaves the server.
 - **Live context injection over conversation IDs** — Codex's conversation memory is opaque; rebuilding context from our own DB each turn is honest and debuggable.
+- **Custom SSE events** — letting the client see tool calls inline is much better UX than waiting for the final text.
 - **`supabase db push --linked --yes` is the workflow** — DB password not needed once project is linked.

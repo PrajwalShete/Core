@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchHistory, streamChat } from './api';
+import { clearHistory, fetchHistory, streamChat, type ToolCallEvent, type ToolResultEvent } from './api';
 import type { ChatMessage } from './types';
 
 export const CHAT_KEY = ['chat-history'] as const;
@@ -13,17 +13,21 @@ export function useChatHistory() {
   });
 }
 
-/**
- * Send a user message and stream the assistant reply. While streaming, an
- * in-memory "pending" assistant bubble is exposed so the UI can render the
- * tokens as they arrive. Once the stream completes, we re-fetch the
- * canonical history from the DB.
- */
+export interface ToolEvent {
+  call_id: string;
+  name: string;
+  args: Record<string, unknown>;
+  status: 'running' | 'ok' | 'error';
+  error?: string;
+  result?: unknown;
+}
+
 export function useChat() {
   const qc = useQueryClient();
   const { data: history = [] } = useChatHistory();
   const [pendingUser, setPendingUser] = useState<string | null>(null);
   const [pendingAssistant, setPendingAssistant] = useState<string>('');
+  const [pendingTools, setPendingTools] = useState<ToolEvent[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -32,12 +36,30 @@ export function useChat() {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || isStreaming) return;
+
+      // ── slash commands ─────────────────────────────────────────────
+      // Currently only /clear. Match case-insensitive, exact (no args).
+      if (/^\/clear\s*$/i.test(trimmed)) {
+        try {
+          await clearHistory();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : String(e));
+          return;
+        }
+        setError(null);
+        setPendingUser(null);
+        setPendingAssistant('');
+        setPendingTools([]);
+        qc.invalidateQueries({ queryKey: CHAT_KEY });
+        return;
+      }
+
       setError(null);
       setPendingUser(trimmed);
       setPendingAssistant('');
+      setPendingTools([]);
       setIsStreaming(true);
 
-      // Build the full message log to send: prior history + the new user turn.
       const turns: { role: 'user' | 'assistant'; content: string }[] = [
         ...history
           .filter((m) => m.role === 'user' || m.role === 'assistant')
@@ -51,6 +73,24 @@ export function useChat() {
           messages: turns,
           signal: abortRef.current.signal,
           onDelta: (chunk) => setPendingAssistant((p) => p + chunk),
+          onToolCall: (e: ToolCallEvent) =>
+            setPendingTools((prev) => [
+              ...prev,
+              { ...e, status: 'running' },
+            ]),
+          onToolResult: (e: ToolResultEvent) =>
+            setPendingTools((prev) =>
+              prev.map((t) =>
+                t.call_id === e.call_id
+                  ? {
+                      ...t,
+                      status: e.ok ? 'ok' : 'error',
+                      ...(e.error ? { error: e.error } : {}),
+                      ...(e.data !== undefined ? { result: e.data } : {}),
+                    }
+                  : t,
+              ),
+            ),
           onError: (msg) => setError(msg),
         });
       } catch (e) {
@@ -61,9 +101,11 @@ export function useChat() {
         setIsStreaming(false);
         setPendingUser(null);
         setPendingAssistant('');
-        // canonical history (including the persisted assistant turn) lives in
-        // the DB — refetch once the stream is done.
+        setPendingTools([]);
         qc.invalidateQueries({ queryKey: CHAT_KEY });
+        // The model may have mutated tasks/comments — refresh those too.
+        qc.invalidateQueries({ queryKey: ['tasks'] });
+        qc.invalidateQueries({ queryKey: ['comments'] });
       }
     },
     [history, isStreaming, qc],
@@ -75,5 +117,14 @@ export function useChat() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  return { history, pendingUser, pendingAssistant, isStreaming, error, send, stop };
+  return {
+    history,
+    pendingUser,
+    pendingAssistant,
+    pendingTools,
+    isStreaming,
+    error,
+    send,
+    stop,
+  };
 }

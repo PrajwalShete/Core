@@ -3,6 +3,7 @@ import { Drawer } from 'vaul';
 import { useChat } from '../hooks';
 import { Message } from './Message';
 import { Composer } from './Composer';
+import { ToolChip } from './ToolChip';
 import { cn } from '@/shared/lib/cn';
 
 /**
@@ -13,8 +14,16 @@ import { cn } from '@/shared/lib/cn';
  */
 export function ChatLauncher() {
   const [open, setOpen] = useState(false);
-  const { history, pendingUser, pendingAssistant, isStreaming, error, send, stop } =
-    useChat();
+  const {
+    history,
+    pendingUser,
+    pendingAssistant,
+    pendingTools,
+    isStreaming,
+    error,
+    send,
+    stop,
+  } = useChat();
   const listRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom while content streams in.
@@ -23,7 +32,7 @@ export function ChatLauncher() {
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [open, history.length, pendingAssistant, pendingUser]);
+  }, [open, history.length, pendingAssistant, pendingUser, pendingTools.length]);
 
   return (
     <>
@@ -108,11 +117,40 @@ export function ChatLauncher() {
                 </div>
               )}
 
-              {history.map((m) => (
-                <Message key={m.id} role={m.role} content={m.content} />
-              ))}
+              {history.map((m) => {
+                if (m.role === 'tool' && Array.isArray(m.tool_calls)) {
+                  return (
+                    <div key={m.id} className="flex flex-col gap-1.5">
+                      {m.tool_calls.map((tc, i) => {
+                        const tr = m.tool_results?.[i];
+                        const ok = tr?.result?.ok ?? true;
+                        return (
+                          <ToolChip
+                            key={`${m.id}-${i}`}
+                            event={{
+                              call_id: `${m.id}-${i}`,
+                              name: tc.name,
+                              args: tc.args ?? {},
+                              status: ok ? 'ok' : 'error',
+                              ...(tr?.result?.error ? { error: tr.result.error } : {}),
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                }
+                return <Message key={m.id} role={m.role} content={m.content} />;
+              })}
 
               {pendingUser && <Message role="user" content={pendingUser} />}
+              {pendingTools.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  {pendingTools.map((t) => (
+                    <ToolChip key={t.call_id} event={t} />
+                  ))}
+                </div>
+              )}
               {(isStreaming || pendingAssistant) && (
                 <Message
                   role="assistant"
