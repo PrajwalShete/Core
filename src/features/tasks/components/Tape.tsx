@@ -19,17 +19,18 @@ export function Tape({ exams, now, onOpen }: Props) {
   let prevMonth = -1;
 
   return (
-    <section className="shrink-0 border-t border-rule pt-6">
-      <div className="mb-5 flex items-baseline justify-between">
-        <div className="text-[0.7rem] font-semibold tracking-[0.26em] text-ink-soft uppercase">
-          Exam season
-        </div>
-        <div className="text-[0.7rem] font-semibold tracking-[0.18em] text-ink-quiet uppercase tabular-nums">
+    <section className="panel shrink-0">
+      <div className="panel-head">
+        <span className="panel-eyebrow">Exam season</span>
+        <span className="panel-badge">
           {fmtMonthDay(firstDue)} — {fmtMonthDay(lastDue)}
-        </div>
+          <span className="ml-2 text-ink-quiet/70">·</span>
+          <span className="ml-2">
+            {exams.length.toString().padStart(2, '0')} {exams.length === 1 ? 'EVENT' : 'EVENTS'}
+          </span>
+        </span>
       </div>
-
-      <div className="grid auto-cols-fr grid-flow-col gap-1.5">
+      <div className="scrollx grid auto-cols-[5.5rem] grid-flow-col gap-px overflow-x-auto bg-rule px-px md:auto-cols-fr md:overflow-x-visible">
         {exams.map((task) => {
           const due = new Date(task.due_at);
           const cellDay = startOfDay(due).getTime();
@@ -45,7 +46,7 @@ export function Tape({ exams, now, onOpen }: Props) {
               type="button"
               onClick={() => onOpen(task)}
               className={cn(
-                'relative flex cursor-pointer flex-col items-start gap-0.5 px-1.5 pt-3 pb-2 text-left transition-opacity',
+                'relative flex cursor-pointer flex-col items-start gap-0.5 bg-bg px-2.5 pt-3.5 pb-2.5 text-left transition-opacity hover:bg-rule/40',
                 isPast && 'opacity-32',
                 task.is_done && 'opacity-30',
               )}
@@ -61,13 +62,13 @@ export function Tape({ exams, now, onOpen }: Props) {
                 />
               )}
               {showMonth && (
-                <span className="absolute -top-5 left-0 text-[0.6rem] font-semibold tracking-[0.22em] text-ink-quiet uppercase">
+                <span className="absolute top-0.5 right-1.5 text-[0.55rem] font-semibold tracking-[0.22em] text-ink-quiet uppercase">
                   {MONTHS_UPPER[due.getMonth()] ?? ''}
                 </span>
               )}
               <span
                 className={cn(
-                  'text-[0.82rem] font-bold tracking-[0.04em]',
+                  'text-[0.78rem] font-bold tracking-[0.04em]',
                   isExam ? 'text-accent' : 'text-ink',
                   task.is_done && 'line-through',
                 )}
@@ -76,7 +77,7 @@ export function Tape({ exams, now, onOpen }: Props) {
               </span>
               <span
                 className={cn(
-                  'text-[0.6rem] font-semibold tracking-[0.22em] uppercase',
+                  'text-[0.55rem] font-semibold tracking-[0.22em] uppercase',
                   isExam ? 'text-accent' : 'text-ink-soft',
                 )}
               >
@@ -84,15 +85,15 @@ export function Tape({ exams, now, onOpen }: Props) {
               </span>
               <span
                 className={cn(
-                  'mt-2 leading-none tracking-[-0.03em] tabular-nums',
-                  isExam ? 'text-[1.85rem] font-bold' : 'text-[1.4rem] font-semibold',
+                  'mt-1.5 leading-none tracking-[-0.03em] tabular-nums',
+                  isExam ? 'text-[1.55rem] font-bold' : 'text-[1.2rem] font-semibold',
                 )}
               >
                 {due.getDate()}
               </span>
               <span
                 className={cn(
-                  'text-[0.6rem] font-semibold tracking-[0.2em] uppercase',
+                  'text-[0.55rem] font-semibold tracking-[0.2em] uppercase',
                   isToday ? 'text-ink' : 'text-ink-quiet',
                 )}
               >

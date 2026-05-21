@@ -2,26 +2,39 @@ import { useMemo, useState } from 'react';
 import { useTasks } from '../hooks';
 import { bucketTasks, pickHero } from '../bucketing';
 import { useNow } from '@/shared/hooks/useNow';
+import { useIsMobile } from '@/shared/hooks/useMediaQuery';
 import type { Task } from '../types';
-import { Header } from './Header';
+import { TopBar } from './TopBar';
 import { Hero } from './Hero';
 import { Quads } from './Quads';
 import { Tape } from './Tape';
+import { Footer } from './Footer';
 import { TaskPanel } from './TaskPanel';
+import { ChatSidebar } from '@/features/chat/components/Sidebar';
+import { ChatLauncher } from '@/features/chat/components/ChatLauncher';
 
 export function Dashboard() {
   const { data: tasks, isLoading, error } = useTasks();
-  const now = useNow(60_000); // re-bucket every minute
+  const now = useNow(60_000);
+  const isMobile = useIsMobile();
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const { buckets, hero, exams } = useMemo(() => {
+  const { buckets, hero, exams, counts } = useMemo(() => {
     const all = tasks ?? [];
     const buckets = bucketTasks(all, now);
     const hero = pickHero(buckets);
     const exams = all
       .filter((t) => t.tag === 'exams')
       .sort((a, b) => +new Date(a.due_at) - +new Date(b.due_at));
-    return { buckets, hero, exams };
+    const counts = {
+      today: buckets.today.filter((t) => !t.is_done).length,
+      done: buckets.today.filter((t) => t.is_done).length,
+      overdue: buckets.overdue.filter((t) => !t.is_done).length,
+      ahead:
+        buckets.tomorrow.filter((t) => !t.is_done).length +
+        buckets.later.filter((t) => !t.is_done && t.tag !== 'exams').length,
+    };
+    return { buckets, hero, exams, counts };
   }, [tasks, now]);
 
   const open = (t: Task) => setOpenId(t.id);
@@ -32,22 +45,79 @@ export function Dashboard() {
     [openId, tasks],
   );
 
-  return (
-    <div className="mx-auto flex h-screen max-w-[1180px] flex-col gap-[2.5vh] overflow-hidden px-[6vw] pt-[3.5vh] pb-[3vh]">
-      <Header />
-      {isLoading && <div className="text-ink-soft">Loading…</div>}
-      {error && (
-        <div className="text-accent">
-          {error instanceof Error ? error.message : 'Could not load tasks.'}
+  /* ────────────────────────────────────────────────────────────────
+   * Mobile layout — single scrolling column + sticky topbar + docked
+   * "Ask Core" launcher at the bottom. No fixed h-screen — the body
+   * scrolls naturally.
+   * ──────────────────────────────────────────────────────────────── */
+  if (isMobile) {
+    return (
+      <div className="flex min-h-svh flex-col bg-bg">
+        {/* sticky topbar respects the iOS notch */}
+        <div className="sticky top-0 z-20 bg-bg pt-safe">
+          <div className="px-3 pb-2">
+            <TopBar counts={counts} />
+          </div>
         </div>
-      )}
-      {!isLoading && !error && (
-        <>
-          <Hero task={hero} now={now} onOpen={open} />
-          <Quads buckets={buckets} heroId={hero?.id ?? null} now={now} onOpen={open} />
-          <Tape exams={exams} now={now} onOpen={open} />
-        </>
-      )}
+
+        {/* main scrolling content. pb leaves room for the docked launcher. */}
+        <main className="flex flex-1 flex-col gap-2 px-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))]">
+          {isLoading && (
+            <div className="panel flex items-center justify-center py-10 text-ink-soft">
+              Loading…
+            </div>
+          )}
+          {error && (
+            <div className="panel flex items-center justify-center py-10 text-accent">
+              {error instanceof Error ? error.message : 'Could not load tasks.'}
+            </div>
+          )}
+          {!isLoading && !error && (
+            <>
+              <Hero task={hero} now={now} onOpen={open} />
+              <Quads buckets={buckets} heroId={hero?.id ?? null} now={now} onOpen={open} />
+              <Tape exams={exams} now={now} onOpen={open} />
+            </>
+          )}
+        </main>
+
+        {/* docked Ask-Core bar */}
+        <ChatLauncher />
+
+        <TaskPanel task={openTask} onClose={close} />
+      </div>
+    );
+  }
+
+  /* ────────────────────────────────────────────────────────────────
+   * Desktop layout — cockpit panels, edge-to-edge, sidebar docked.
+   * ──────────────────────────────────────────────────────────────── */
+  return (
+    <div className="flex h-svh gap-2 overflow-hidden px-3 pt-3 pb-3 md:gap-2.5 md:px-4 md:pt-4 md:pb-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 md:gap-2.5">
+        <TopBar counts={counts} />
+        {isLoading && (
+          <div className="panel flex flex-1 items-center justify-center text-ink-soft">
+            Loading…
+          </div>
+        )}
+        {error && (
+          <div className="panel flex flex-1 items-center justify-center text-accent">
+            {error instanceof Error ? error.message : 'Could not load tasks.'}
+          </div>
+        )}
+        {!isLoading && !error && (
+          <>
+            <Hero task={hero} now={now} onOpen={open} />
+            <Quads buckets={buckets} heroId={hero?.id ?? null} now={now} onOpen={open} />
+            <Tape exams={exams} now={now} onOpen={open} />
+          </>
+        )}
+        <Footer />
+      </div>
+
+      <ChatSidebar />
+
       <TaskPanel task={openTask} onClose={close} />
     </div>
   );

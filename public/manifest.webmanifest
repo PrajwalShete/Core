@@ -1,0 +1,19 @@
+{
+  "name": "Core",
+  "short_name": "Core",
+  "description": "Personal task dashboard with an AI co-pilot.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#131210",
+  "theme_color": "#131210",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -29,20 +29,137 @@
   html,
   body,
   #root {
-    height: 100%;
+    /* svh is the *stable* mobile viewport height — does not reflow when
+       the URL bar animates. dvh elsewhere only where we *want* to track
+       the dynamic viewport (e.g. the chat sheet). */
+    min-height: 100svh;
     background: var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-display);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+
+    /* Make taps feel native — no 300ms delay, no blue flash. */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
   }
 
   body {
     margin: 0;
+    /* Prevent rubber-band scrolling into the browser chrome when the
+       inner content reaches its scroll limits. */
+    overscroll-behavior: none;
+  }
+
+  /* Chrome elements (panel headers, footers, the topbar) shouldn't be
+     selectable — but content (titles, message text) should. */
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+    user-select: none;
   }
 
   ::selection {
     background: var(--color-accent);
     color: var(--color-bg);
+  }
+
+  /* Smoother scrolling on iOS. */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Hide native scrollbars only inside .scrollx (horizontal scrolling
+     status pills / exam tape on mobile look better without them). */
+  .scrollx::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollx {
+    scrollbar-width: none;
+  }
+}
+
+/* ── utilities ─────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Safe-area-aware padding. Use these on the topbar (top), composer bar
+     (bottom), and the chat sheet handle. */
+  .pt-safe {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+  .pb-safe {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .pb-safe-0 {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .h-dvh {
+    height: 100dvh;
+  }
+  .h-svh {
+    height: 100svh;
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+  .min-h-svh {
+    min-height: 100svh;
+  }
+}
+
+/* ── components ────────────────────────────────────────────────────── */
+@layer components {
+  /* a cockpit panel: hairline border, square corners, no padding so the
+     content controls its own rhythm. Use .panel-pad to add a default inset. */
+  .panel {
+    border: 1px solid var(--color-rule);
+    background: var(--color-bg);
+    position: relative;
+  }
+  .panel-pad {
+    padding: 0.9rem 1.05rem;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.55rem 1.05rem;
+    border-bottom: 1px solid var(--color-rule);
+  }
+  .panel-eyebrow {
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    color: var(--color-ink-soft);
+    text-transform: uppercase;
+  }
+  .panel-badge {
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--color-ink-quiet);
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+  /* corner ticks — tiny cockpit-y accents at the panel corners */
+  .panel-ticks::before,
+  .panel-ticks::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-color: var(--color-ink-quiet);
+  }
+  .panel-ticks::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+  .panel-ticks::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1px solid;
+    border-right: 1px solid;
   }
 }

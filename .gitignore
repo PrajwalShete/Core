@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Never commit migrations that carry live secrets — these are temp
+# helpers used to seed credentials into oauth_tokens. Belt-and-braces
+# guard in case one gets left behind.
+supabase/migrations/*seed_codex*.sql
+supabase/migrations/*seed_tokens*.sql
+supabase/migrations/*_secrets_*.sql
